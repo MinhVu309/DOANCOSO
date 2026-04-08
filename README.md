@@ -8,8 +8,9 @@
 
 ```
 NhatKi/
-├── client/          # Frontend — React + Tailwind CSS
-└── backend/         # Backend  — FastAPI + SQLAlchemy
+├── client/              # Frontend — React + Tailwind CSS
+├── backend/             # Backend  — FastAPI + SQLAlchemy
+└── docker-compose.yml   # PostgreSQL database
 ```
 
 ---
@@ -36,9 +37,13 @@ NhatKi/
 ### Backend
 - **FastAPI** — REST API
 - **SQLAlchemy 2** + **Alembic** — ORM và migrations
-- **SQLite** (dev) / **PostgreSQL** (production)
-- **passlib[bcrypt]** — hash mật khẩu
+- **PostgreSQL** — database (chạy qua Docker)
+- **bcrypt** — hash mật khẩu
 - **python-jose** — JWT authentication
+
+### Infrastructure
+- **Docker** + **docker-compose** — chạy PostgreSQL
+- **DBeaver** — quản lý database
 
 ---
 
@@ -47,10 +52,22 @@ NhatKi/
 ### Yêu cầu
 - Node.js >= 18
 - Python >= 3.10
+- Docker Desktop
 
 ---
 
-### Backend
+### 1. Khởi động Database
+
+```bash
+# Tại thư mục gốc NhatKi/
+docker-compose up -d
+```
+
+PostgreSQL sẽ chạy tại `localhost:5432`.
+
+---
+
+### 2. Backend
 
 ```bash
 cd backend
@@ -77,7 +94,7 @@ Swagger UI: http://localhost:8000/docs
 
 ---
 
-### Frontend
+### 3. Frontend
 
 ```bash
 cd client
@@ -90,6 +107,20 @@ npm start
 ```
 
 Frontend chạy tại: http://localhost:3000
+
+---
+
+## Kết nối DBeaver
+
+Vào DBeaver → **New Connection** → **PostgreSQL** → điền thông tin:
+
+| Trường | Giá trị |
+|---|---|
+| Host | `localhost` |
+| Port | `5432` |
+| Database | `nhatki` |
+| Username | `nhatki` |
+| Password | `nhatki123` |
 
 ---
 
@@ -117,9 +148,10 @@ POST /api/auth/register
 #### Ví dụ đăng nhập
 ```json
 POST /api/auth/login
-Content-Type: application/x-www-form-urlencoded
-
-username=user@example.com&password=matkhau123
+{
+  "email": "user@example.com",
+  "password": "matkhau123"
+}
 ```
 
 ---
