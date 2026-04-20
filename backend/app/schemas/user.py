@@ -49,3 +49,42 @@ class UserLogin(BaseModel):
 
 class TokenData(BaseModel):
     user_id: Optional[int] = None
+
+
+# --- Profile & Preferences ---
+
+from datetime import date  # noqa: E402
+from typing import List  # noqa: E402
+from pydantic import ConfigDict  # noqa: E402
+
+
+class UserProfileUpdate(BaseModel):
+    display_name: Optional[str] = None
+    birth_date: Optional[date] = None
+    timezone: Optional[str] = None
+
+
+class UserProfileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    display_name: Optional[str] = None
+    email: str
+    birth_date: Optional[date] = None
+    timezone: str
+    avatar_url: Optional[str] = None
+
+
+class UserPreferencesUpdate(BaseModel):
+    theme: Optional[str] = None
+    reminder_enabled: Optional[bool] = None
+    reminder_time: Optional[str] = None
+    reminder_days: Optional[List[str]] = None
+
+
+class UserPreferencesResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    theme: str
+    reminder_enabled: bool
+    reminder_time: Optional[str] = None
+    reminder_days: List[str] = []

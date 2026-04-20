@@ -1,16 +1,45 @@
-# Frontend
+# ─── Frontend ───────────────────────────────────────────
 client/node_modules/
 client/build/
+client/.env
+client/.env.local
+client/.env.*.local
 
-# Backend
+# ─── Backend ────────────────────────────────────────────
 backend/venv/
-backend/__pycache__/
-backend/**/__pycache__/
-backend/*.db
 backend/.env
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+backend/uploads/avatars/*
+!backend/uploads/avatars/.gitkeep
 
-# IDE
+# Python cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Alembic (chỉ ignore file .pyc, giữ versions/)
+backend/alembic/versions/*.pyc
+
+# ─── Module-1 AI ────────────────────────────────────────
+Module-1/venv/
+Module-1/.env
+Module-1/Model/*.pth
+Module-1/Model/*.pt
+Module-1/Model/*.bin
+
+# ─── IDE & OS ───────────────────────────────────────────
 .DS_Store
 .vscode/
 .idea/
+*.swp
+*.swo
+Thumbs.db
+
+# ─── Claude Code ────────────────────────────────────────
 .claude/
+CLAUDE.md

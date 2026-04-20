@@ -1,0 +1,11 @@
+pandas
+openpyxl
+transformers
+scikit-learn
+underthesea
+pyvi
+tqdm
+torch
+torchvision
+torchaudio
+emoji

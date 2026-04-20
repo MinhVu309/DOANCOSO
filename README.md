@@ -4,13 +4,24 @@
 
 ---
 
-## Tổng quan dự án
+## Kiến trúc tổng quan
 
 ```
 NhatKi/
-├── client/              # Frontend — React + Tailwind CSS
-├── backend/             # Backend  — FastAPI + SQLAlchemy
-└── docker-compose.yml   # PostgreSQL database
+├── client/              # Frontend  — React 19 + Tailwind CSS     :3000
+├── backend/             # Backend   — FastAPI + PostgreSQL         :8000
+├── Module-1/            # AI Service — PhoBERT multitask          :8001
+└── docker-compose.yml   # PostgreSQL 16
+```
+
+```
+Frontend (React :3000)
+    ↕ REST + JWT
+Backend (FastAPI :8000)   — auth, entries, categories, trends, users
+    ↕ HTTP (httpx)
+Module-1 AI (FastAPI :8001) — emotion (7 nhãn) + hate speech (3 nhãn)
+    ↕ stub
+Module-2 (chưa có)         — đánh giá chuyên sâu
 ```
 
 ---
@@ -19,31 +30,37 @@ NhatKi/
 
 | Trang | Mô tả |
 |---|---|
-| **Journaling** | Viết nhật ký, gắn tag cảm xúc, phân tích sentiment bằng AI |
-| **History** | Xem lại các bài nhật ký theo ngày/tháng |
-| **Trends** | Biểu đồ tâm trạng, chỉ số căng thẳng/lo âu, streak viết |
-| **Categories** | Quản lý danh mục nhật ký |
-| **Settings** | Cài đặt tài khoản, thông báo, giao diện, bảo mật |
+| **Đăng nhập / Đăng ký** | JWT auth, form validation |
+| **Journaling** | Viết nhật ký, gắn tag, chọn danh mục, phân tích AI real-time |
+| **History** | Xem lại nhật ký nhóm theo tháng, hiển thị kết quả AI |
+| **Trends** | Biểu đồ tâm trạng, streak viết, chỉ số tinh thần, cảm xúc phổ biến |
+| **Categories** | Tạo/xóa danh mục với icon và màu sắc tuỳ chỉnh |
+| **Settings** | Profile, avatar upload, nhắc nhở, giao diện |
 
 ---
 
 ## Tech Stack
 
 ### Frontend
-- **React 19** + React Router DOM
-- **Tailwind CSS** — giao diện Material Design 3
+- **React 19** + React Router DOM 7
+- **Tailwind CSS** — Material Design 3 theme
+- **Axios** — HTTP client với auto JWT injection
 - **Material Symbols** — icon set
 
 ### Backend
-- **FastAPI** — REST API
-- **SQLAlchemy 2** + **Alembic** — ORM và migrations
-- **PostgreSQL** — database (chạy qua Docker)
-- **bcrypt** — hash mật khẩu
-- **python-jose** — JWT authentication
+- **FastAPI** — REST API, async
+- **SQLAlchemy 2** + **Alembic** — ORM & migrations
+- **PostgreSQL 16** — database (Docker)
+- **bcrypt** + **python-jose** — password hashing & JWT
+- **httpx** — async HTTP client gọi Module-1
+
+### AI Service (Module-1)
+- **PhoBERT** (`vinai/phobert-base`) — Vietnamese NLP
+- **PyTorch** — multitask model (emotion + hate speech)
+- **FastAPI** — service wrapper
 
 ### Infrastructure
-- **Docker** + **docker-compose** — chạy PostgreSQL
-- **DBeaver** — quản lý database
+- **Docker** + **docker-compose** — PostgreSQL
 
 ---
 
@@ -54,8 +71,6 @@ NhatKi/
 - Python >= 3.10
 - Docker Desktop
 
----
-
 ### 1. Khởi động Database
 
 ```bash
@@ -63,56 +78,178 @@ NhatKi/
 docker-compose up -d
 ```
 
-PostgreSQL sẽ chạy tại `localhost:5432`.
-
----
+PostgreSQL chạy tại `localhost:5432`.
 
 ### 2. Backend
 
 ```bash
 cd backend
-
-# Tạo môi trường ảo
 python3 -m venv venv
 source venv/bin/activate        # macOS/Linux
-# venv\Scripts\activate         # Windows
 
-# Cài dependencies
 pip install -r requirements.txt
 
-# Cấu hình môi trường
-cp .env.example .env
-# Mở .env và thay SECRET_KEY bằng key thật:
-# python3 -c "import secrets; print(secrets.token_hex(32))"
+# Tạo .env (nếu chưa có)
+cat > .env << 'EOF'
+DATABASE_URL=postgresql://nhatki:nhatki123@localhost:5432/nhatki
+SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+EOF
+
+# Chạy migrations
+alembic upgrade head
+
+# (Tùy chọn) Seed data mẫu
+python -m app.seed
 
 # Chạy server
 uvicorn app.main:app --reload
 ```
 
-Backend chạy tại: http://localhost:8000
-Swagger UI: http://localhost:8000/docs
+Backend: http://localhost:8000 | Swagger: http://localhost:8000/docs
 
----
+### 3. Module-1 AI Service
 
-### 3. Frontend
+> Bắt buộc có file `Module-1/Model/best_multitask_model.pth` (không commit vào repo).
+
+```bash
+cd Module-1
+python3 -m venv venv
+source venv/bin/activate
+
+pip install -r requirements.txt
+
+# Phải chạy từ thư mục Module-1/
+uvicorn api.main:app --reload --port 8001
+```
+
+Module-1: http://localhost:8001 | Swagger: http://localhost:8001/docs
+
+### 4. Frontend
 
 ```bash
 cd client
-
-# Cài dependencies
 npm install
-
-# Chạy dev server
 npm start
 ```
 
-Frontend chạy tại: http://localhost:3000
+Frontend: http://localhost:3000
+
+---
+
+## Tài khoản test (sau khi seed)
+
+```
+Email:    test@nhatki.app
+Password: test123
+```
+
+---
+
+## API Endpoints
+
+### Auth (`:8000`)
+
+| Method | Endpoint | Auth | Mô tả |
+|---|---|---|---|
+| POST | `/api/auth/register` | — | Đăng ký |
+| POST | `/api/auth/login` | — | Đăng nhập → JWT |
+| GET | `/api/auth/me` | Bearer | Thông tin user |
+
+### Entries (`:8000`)
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/api/entries` | Danh sách (filter: date, category, tag, grouped) |
+| POST | `/api/entries` | Tạo nhật ký mới |
+| GET | `/api/entries/{id}` | Chi tiết |
+| PUT | `/api/entries/{id}` | Cập nhật |
+| DELETE | `/api/entries/{id}` | Xóa |
+| POST | `/api/entries/{id}/analyze` | Trigger AI phân tích |
+| GET | `/api/entries/{id}/analysis` | Xem kết quả phân tích |
+
+### Categories (`:8000`)
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/api/categories` | Danh sách + entry_count |
+| POST | `/api/categories` | Tạo mới |
+| PUT | `/api/categories/{id}` | Cập nhật |
+| DELETE | `/api/categories/{id}` | Xóa |
+
+### Trends (`:8000`)
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/api/trends/mood-chart?period=week\|month` | Biểu đồ tâm trạng |
+| GET | `/api/trends/streak` | Streak & tổng entries |
+| GET | `/api/trends/mental-index?period=month` | Chỉ số tinh thần |
+| GET | `/api/trends/top-emotions?period=week` | Cảm xúc phổ biến |
+
+### Users (`:8000`)
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/api/users/me/profile` | Hồ sơ |
+| PUT | `/api/users/me/profile` | Cập nhật hồ sơ |
+| POST | `/api/users/me/avatar` | Upload avatar |
+| DELETE | `/api/users/me/avatar` | Xóa avatar |
+| GET | `/api/users/me/preferences` | Tùy chọn |
+| PUT | `/api/users/me/preferences` | Cập nhật tùy chọn |
+
+### AI Analyze (`:8001`)
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| POST | `/api/analyze` | Phân tích emotion + hate speech |
+| POST | `/api/assess` | Gọi Module-2 trực tiếp |
+
+---
+
+## Database Schema
+
+```
+users
+  └─ entries        (user_id FK)
+       ├─ entry_tags        (entry_id FK)
+       └─ analysis_results  (entry_id FK, unique)
+  └─ categories     (user_id FK)
+  └─ user_preferences (user_id FK, unique)
+```
+
+### Emotion labels
+`Anger · Disgust · Enjoyment · Fear · Other · Sadness · Surprise`
+
+### Hate speech labels
+`Clean · Offensive · Hate`
+
+---
+
+## Database Migrations
+
+```bash
+cd backend
+source venv/bin/activate
+
+alembic revision --autogenerate -m "tên migration"
+alembic upgrade head
+alembic downgrade -1
+```
+
+---
+
+## Bảo mật
+
+- Mật khẩu hash bằng **bcrypt** với salt tự động
+- JWT **HS256**, hết hạn sau 24 giờ
+- Timing-safe auth — tránh user enumeration
+- Ownership check trên mọi query (không lộ data user khác)
+- Upload giới hạn 5MB, chỉ chấp nhận JPG/PNG/WEBP
 
 ---
 
 ## Kết nối DBeaver
-
-Vào DBeaver → **New Connection** → **PostgreSQL** → điền thông tin:
 
 | Trường | Giá trị |
 |---|---|
@@ -121,62 +258,3 @@ Vào DBeaver → **New Connection** → **PostgreSQL** → điền thông tin:
 | Database | `nhatki` |
 | Username | `nhatki` |
 | Password | `nhatki123` |
-
----
-
-## API Endpoints
-
-### Auth
-
-| Method | Endpoint | Mô tả |
-|---|---|---|
-| POST | `/api/auth/register` | Đăng ký tài khoản |
-| POST | `/api/auth/login` | Đăng nhập, trả về JWT |
-| GET | `/api/auth/me` | Lấy thông tin user hiện tại |
-
-#### Ví dụ đăng ký
-```json
-POST /api/auth/register
-{
-  "email": "user@example.com",
-  "username": "nguyen_van_a",
-  "password": "matkhau123",
-  "display_name": "Nguyễn Văn A"
-}
-```
-
-#### Ví dụ đăng nhập
-```json
-POST /api/auth/login
-{
-  "email": "user@example.com",
-  "password": "matkhau123"
-}
-```
-
----
-
-## Bảo mật
-
-- Mật khẩu được hash bằng **bcrypt** với salt tự động
-- JWT token ký bằng **HS256**, hết hạn sau 24 giờ
-- Timing-safe authentication — tránh timing attack khi sai email
-- Validation đầu vào qua **Pydantic**
-
----
-
-## Database Migrations (Alembic)
-
-```bash
-cd backend
-source venv/bin/activate
-
-# Tạo migration mới
-alembic revision --autogenerate -m "tên migration"
-
-# Chạy migration
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
-```

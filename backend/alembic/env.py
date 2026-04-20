@@ -7,6 +7,11 @@ from app.database import Base
 
 # Import tất cả models để Alembic nhận diện
 from app.models import user  # noqa: F401
+from app.models import category  # noqa: F401
+from app.models import entry  # noqa: F401
+from app.models import entry_tag  # noqa: F401
+from app.models import analysis_result  # noqa: F401
+from app.models import user_preference  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
