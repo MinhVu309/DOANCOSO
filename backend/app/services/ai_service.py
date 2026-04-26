@@ -8,6 +8,9 @@ from ..constants import EMOTION_MAPPING, AI_SUMMARY_TEMPLATES, AI_TAGS_BY_EMOTIO
 from ..models.analysis_result import AnalysisResult
 from .condition_service import aggregate_user_conditions
 
+EMOTION_MIN_CONFIDENCE = 0.4
+HATE_MIN_CONFIDENCE    = 0.5
+
 
 async def analyze_entry(db: Session, entry_id: UUID) -> AnalysisResult:
     """Call Module-1, parse result, upsert AnalysisResult row, return it."""
@@ -34,6 +37,13 @@ async def analyze_entry(db: Session, entry_id: UUID) -> AnalysisResult:
     emotion_score: float = raw.get("emotion_confidence", 0.0)
     hate_label: str = raw.get("hate_speech", "Clean")
     hate_score: float = raw.get("hate_confidence", 0.0)
+
+    # Áp ngưỡng min confidence — dưới ngưỡng thì fallback về nhãn an toàn
+    if emotion_score < EMOTION_MIN_CONFIDENCE:
+        emotion_label = "Other"
+    if hate_score < HATE_MIN_CONFIDENCE:
+        hate_label = "Clean"
+
     needs_assessment: bool = raw.get("needs_assessment", False)
 
     assessment = raw.get("assessment") or {}

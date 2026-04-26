@@ -8,7 +8,7 @@ from ..models.user_condition import UserCondition
 
 CONDITION_WINDOW_DAYS = 30
 CONDITION_MIN_OCCURRENCES = 3
-CONDITION_MIN_CONFIDENCE = 0.3
+CONDITION_MIN_CONFIDENCE = 0.6
 
 
 def aggregate_user_conditions(db: Session, user_id: int) -> None:
