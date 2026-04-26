@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..constants import EMOTION_MAPPING, AI_SUMMARY_TEMPLATES, AI_TAGS_BY_EMOTION
 from ..models.analysis_result import AnalysisResult
+from .condition_service import aggregate_user_conditions
 
 
 async def analyze_entry(db: Session, entry_id: UUID) -> AnalysisResult:
@@ -73,6 +74,10 @@ async def analyze_entry(db: Session, entry_id: UUID) -> AnalysisResult:
     db.add(result)
     db.commit()
     db.refresh(result)
+
+    # Tich luy du lieu condition sau moi bai analyze
+    aggregate_user_conditions(db, entry.user_id)
+
     return result
 
 

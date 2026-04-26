@@ -1,6 +1,6 @@
 from typing import List, Optional
-from datetime import date
-from pydantic import BaseModel
+from datetime import date, datetime
+from pydantic import BaseModel, ConfigDict
 
 
 class MoodChartPoint(BaseModel):
@@ -41,3 +41,20 @@ class TopEmotionItem(BaseModel):
 class TopEmotionsResponse(BaseModel):
     period: str
     emotions: List[TopEmotionItem]
+
+
+class UserConditionItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    condition_name: str
+    occurrence_count: int
+    avg_confidence: float
+    first_seen_at: datetime
+    last_seen_at: datetime
+    confirmed: bool
+
+
+class MentalHealthSummaryResponse(BaseModel):
+    window_days: int
+    min_occurrences: int
+    conditions: List[UserConditionItem]
