@@ -14,8 +14,9 @@ MODEL_PATH = os.path.join(BASE_DIR, 'Model', 'best_multitask_model.pth')
 DICT_PATH  = os.path.join(BASE_DIR, 'data', 'Xử lý teencode.xlsx')
 
 # Nhãn được coi là "bình thường", không cần gửi sang Module-2
-SAFE_EMOTIONS   = {'Enjoyment', 'Other'}
-SAFE_HATE_LABEL = 'Clean'
+SAFE_EMOTIONS    = {'Enjoyment', 'Other'}
+SAFE_HATE_LABEL  = 'Clean'
+EMOTION_THRESHOLD = 0.3
 
 
 @lru_cache(maxsize=1)
@@ -24,18 +25,24 @@ def get_predictor() -> EmotionHatePredictor:
     return EmotionHatePredictor(model_path=MODEL_PATH, dict_path=DICT_PATH)
 
 
-def is_safe(emotion: str, hate_speech: str) -> bool:
+def get_triggered_emotions(emotion_scores: list[dict]) -> list[str]:
     """
-    Trả về True nếu văn bản bình thường, không cần đánh giá thêm.
-    Điều kiện: emotion thuộc {Enjoyment, Other} VÀ hate = Clean.
+    Trả về danh sách nhãn cảm xúc có confidence > EMOTION_THRESHOLD
+    và KHÔNG thuộc SAFE_EMOTIONS — đây là các nhãn cần gửi sang Module-2.
     """
-    return emotion in SAFE_EMOTIONS and hate_speech == SAFE_HATE_LABEL
+    return [
+        s["label"] for s in emotion_scores
+        if s["confidence"] > EMOTION_THRESHOLD and s["label"] not in SAFE_EMOTIONS
+    ]
 
 
 def analyze(text: str) -> dict:
     """
-    Chạy Module-1 và thêm trường needs_assessment.
+    Chạy Module-1, tính triggered_emotions và needs_assessment.
     """
     result = get_predictor().predict(text)
-    result['needs_assessment'] = not is_safe(result['emotion'], result['hate_speech'])
+    triggered = get_triggered_emotions(result['emotion_scores'])
+    result['triggered_emotions'] = triggered
+    # Cần đánh giá thêm nếu có nhãn cảm xúc vượt ngưỡng HOẶC hate speech != Clean
+    result['needs_assessment'] = bool(triggered) or result['hate_speech'] != SAFE_HATE_LABEL
     return result

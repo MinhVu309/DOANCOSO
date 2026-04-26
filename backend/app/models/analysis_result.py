@@ -24,6 +24,7 @@ class AnalysisResult(Base):
     condition = Column(String(100), nullable=True)
     condition_confidence = Column(Float, nullable=True)
     severity = Column(String(50), nullable=True)
+    conditions = Column(JSON, nullable=True)  # top-5: [{"label": str, "confidence": float}]
 
     # Derived fields
     mood_label_vi = Column(String(50), nullable=False)

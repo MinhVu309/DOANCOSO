@@ -58,6 +58,18 @@ function EntryCard({ entry }) {
         </div>
       )}
 
+      {analysis?.condition && (
+        <div className="flex items-center gap-2 pt-2 border-t border-outline-variant/20">
+          <span className="material-symbols-outlined text-sm" style={{ color: '#6B538A', fontVariationSettings: "'FILL' 1" }}>neurology</span>
+          <span className="text-xs text-on-surface-variant">
+            <span className="font-semibold text-on-surface">{analysis.condition}</span>
+            {analysis.condition_confidence != null && (
+              <span className="ml-1 opacity-60">· {Math.round(analysis.condition_confidence * 100)}%</span>
+            )}
+          </span>
+        </div>
+      )}
+
       {entry.user_tags?.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {entry.user_tags.map(tag => (

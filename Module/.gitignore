@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Model weights — luu tren Google Drive, khong commit vao repo
+Model/*.pth
+Model/*.pkl
+Model/*.pt
+
+# OS rác
+.DS_Store
+Thumbs.db

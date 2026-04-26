@@ -1,6 +1,6 @@
 # NhatKi — Ứng dụng Nhật Ký Tâm An
 
-Ứng dụng nhật ký cá nhân với tính năng phân tích cảm xúc bằng AI, giúp người dùng theo dõi tâm trạng và sức khỏe tinh thần mỗi ngày.
+Ứng dụng nhật ký cá nhân với tính năng phân tích cảm xúc và đánh giá sức khỏe tâm thần bằng AI, giúp người dùng theo dõi tâm trạng mỗi ngày.
 
 ---
 
@@ -8,20 +8,34 @@
 
 ```
 NhatKi/
-├── client/              # Frontend  — React 19 + Tailwind CSS     :3000
-├── backend/             # Backend   — FastAPI + PostgreSQL         :8000
-├── Module-1/            # AI Service — PhoBERT multitask          :8001
+├── client/              # Frontend  — React 19 + Tailwind CSS        :3000
+├── backend/             # Backend   — FastAPI + PostgreSQL            :8000
+├── Module/              # AI Service — Module-1 + Module-2 (PhoBERT) :8001
 └── docker-compose.yml   # PostgreSQL 16
 ```
 
 ```
 Frontend (React :3000)
     ↕ REST + JWT
-Backend (FastAPI :8000)   — auth, entries, categories, trends, users
+Backend (FastAPI :8000)      — auth, entries, categories, trends, users
     ↕ HTTP (httpx)
-Module-1 AI (FastAPI :8001) — emotion (7 nhãn) + hate speech (3 nhãn)
-    ↕ stub
-Module-2 (chưa có)         — đánh giá chuyên sâu
+Module AI (FastAPI :8001)
+    ├── Module-1             — emotion (7 nhãn) + hate speech (3 nhãn)
+    └── Module-2             — đánh giá 58 tình trạng sức khỏe tâm thần
+```
+
+**Luồng xử lý:**
+
+```
+Người dùng viết nhật ký
+    → POST /api/entries/{id}/analyze  (Backend :8000)
+    → POST /api/analyze               (Module AI :8001)
+         → Module-1: phân tích cảm xúc (7 nhãn) + hate speech (3 nhãn)
+              → Lọc: nhãn cảm xúc có confidence > 0.3 và ngoài {Enjoyment, Other}
+                     HOẶC hate speech != Clean  →  triggered_emotions
+         → Module-2: đánh giá 58 tình trạng tâm thần
+              (nhận toàn bộ triggered_emotions thay vì chỉ 1 nhãn)
+    ← Kết quả: tâm trạng + triggered_emotions + top-5 tình trạng sức khỏe tâm thần
 ```
 
 ---
@@ -52,26 +66,40 @@ Module-2 (chưa có)         — đánh giá chuyên sâu
 - **SQLAlchemy 2** + **Alembic** — ORM & migrations
 - **PostgreSQL 16** — database (Docker)
 - **bcrypt** + **python-jose** — password hashing & JWT
-- **httpx** — async HTTP client gọi Module-1
+- **httpx** — async HTTP client gọi Module AI
 
-### AI Service (Module-1)
-- **PhoBERT** (`vinai/phobert-base`) — Vietnamese NLP
-- **PyTorch** — multitask model (emotion + hate speech)
-- **FastAPI** — service wrapper
+### AI Service (`Module/`)
+- **PhoBERT** (`vinai/phobert-base`) — Vietnamese NLP backbone
+- **Module-1** — Multi-task model: emotion (7 nhãn) + hate speech (3 nhãn)
+- **Module-2** — Multi-label model: 58 tình trạng sức khỏe tâm thần
+- **PyTorch** + **FastAPI**
 
 ### Infrastructure
 - **Docker** + **docker-compose** — PostgreSQL
 
 ---
 
-## Cài đặt & Chạy
+## Yêu cầu hệ thống
 
-### Yêu cầu
 - Node.js >= 18
-- Python >= 3.10
+- Python >= 3.10 (khuyến nghị 3.12)
 - Docker Desktop
 
-### 1. Khởi động Database
+### File model (không commit vào repo)
+
+Đặt vào `Module/Model/`:
+```
+Module/Model/
+├── best_multitask_model.pth         # Module-1 (~517MB)
+├── best_mental_health_multilabel.pth # Module-2 (~516MB)
+└── label_names.pkl                  # 58 nhãn tình trạng tâm thần
+```
+
+---
+
+## Cài đặt & Chạy
+
+### 1. Database
 
 ```bash
 # Tại thư mục gốc NhatKi/
@@ -86,22 +114,25 @@ PostgreSQL chạy tại `localhost:5432`.
 cd backend
 python3 -m venv venv
 source venv/bin/activate        # macOS/Linux
+# venv\Scripts\activate         # Windows
 
 pip install -r requirements.txt
+```
 
-# Tạo .env (nếu chưa có)
-cat > .env << 'EOF'
+Tạo file `backend/.env`:
+```env
 DATABASE_URL=postgresql://nhatki:nhatki123@localhost:5432/nhatki
-SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+SECRET_KEY=<chạy lệnh bên dưới để tạo>
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
-EOF
+```
+
+```bash
+# Tạo SECRET_KEY
+python3 -c "import secrets; print(secrets.token_hex(32))"
 
 # Chạy migrations
 alembic upgrade head
-
-# (Tùy chọn) Seed data mẫu
-python -m app.seed
 
 # Chạy server
 uvicorn app.main:app --reload
@@ -109,22 +140,25 @@ uvicorn app.main:app --reload
 
 Backend: http://localhost:8000 | Swagger: http://localhost:8000/docs
 
-### 3. Module-1 AI Service
+### 3. Module AI Service
 
-> Bắt buộc có file `Module-1/Model/best_multitask_model.pth` (không commit vào repo).
+> Cần có đủ 3 file model trong `Module/Model/` trước khi chạy.
 
 ```bash
-cd Module-1
+cd Module
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate        # macOS/Linux
+# venv\Scripts\activate         # Windows
 
 pip install -r requirements.txt
 
-# Phải chạy từ thư mục Module-1/
+# Phải chạy từ thư mục Module/
 uvicorn api.main:app --reload --port 8001
 ```
 
-Module-1: http://localhost:8001 | Swagger: http://localhost:8001/docs
+Module AI: http://localhost:8001 | Swagger: http://localhost:8001/docs
+
+Lần đầu khởi động sẽ mất 30–60 giây để load cả 2 model vào bộ nhớ.
 
 ### 4. Frontend
 
@@ -198,12 +232,39 @@ Password: test123
 | GET | `/api/users/me/preferences` | Tùy chọn |
 | PUT | `/api/users/me/preferences` | Cập nhật tùy chọn |
 
-### AI Analyze (`:8001`)
+### AI Module (`:8001`)
 
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| POST | `/api/analyze` | Phân tích emotion + hate speech |
-| POST | `/api/assess` | Gọi Module-2 trực tiếp |
+| POST | `/api/analyze` | Module-1 phân tích → nếu có nhãn > 0.3 tự gọi Module-2 |
+| POST | `/api/assess` | Module-2 trực tiếp (nhận `emotions: list[str]`) |
+
+**Ví dụ response `/api/analyze`:**
+```json
+{
+  "emotion": "Sadness",
+  "emotion_confidence": 0.82,
+  "hate_speech": "Clean",
+  "hate_confidence": 0.91,
+  "emotion_scores": [
+    { "label": "Sadness",   "confidence": 0.82 },
+    { "label": "Fear",      "confidence": 0.41 },
+    { "label": "Anger",     "confidence": 0.28 },
+    { "label": "Enjoyment", "confidence": 0.06 }
+  ],
+  "triggered_emotions": ["Sadness", "Fear"],
+  "needs_assessment": true,
+  "assessment": {
+    "condition": "Rối loạn trầm cảm",
+    "confidence": 0.87,
+    "conditions": [
+      { "label": "Rối loạn trầm cảm", "confidence": 0.87 },
+      { "label": "Mất ngủ",           "confidence": 0.65 },
+      { "label": "Rối loạn lo âu",    "confidence": 0.58 }
+    ]
+  }
+}
+```
 
 ---
 
@@ -218,11 +279,14 @@ users
   └─ user_preferences (user_id FK, unique)
 ```
 
-### Emotion labels
+### Emotion labels (Module-1)
 `Anger · Disgust · Enjoyment · Fear · Other · Sadness · Surprise`
 
-### Hate speech labels
+### Hate speech labels (Module-1)
 `Clean · Offensive · Hate`
+
+### Mental health labels (Module-2)
+58 tình trạng bao gồm: Rối loạn trầm cảm, Rối loạn lo âu, Mất ngủ, Căng thẳng Stress, Rối loạn lưỡng cực, PTSD, OCD, ADHD, Tâm thần phân liệt, Bệnh Alzheimer, Bệnh Parkinson...
 
 ---
 

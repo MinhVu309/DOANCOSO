@@ -39,6 +39,7 @@ async def analyze_entry(db: Session, entry_id: UUID) -> AnalysisResult:
     condition = assessment.get("condition")
     condition_confidence = assessment.get("confidence")
     severity = assessment.get("severity")
+    conditions = assessment.get("conditions")  # top-5 list từ Module-2
 
     mapping = EMOTION_MAPPING.get(emotion_label, EMOTION_MAPPING["Other"])
     mood_label_vi = mapping["vi"]
@@ -62,6 +63,7 @@ async def analyze_entry(db: Session, entry_id: UUID) -> AnalysisResult:
         condition=condition,
         condition_confidence=condition_confidence,
         severity=severity,
+        conditions=conditions,
         mood_label_vi=mood_label_vi,
         mood_color=mood_color,
         ai_summary=ai_summary,

@@ -16,10 +16,16 @@ class LabelScore(BaseModel):
     confidence: float
 
 
+class ConditionScore(BaseModel):
+    label: str
+    confidence: float
+
+
 class AssessmentResult(BaseModel):
     condition: str
     confidence: float
     severity: str | None = None
+    conditions: list[ConditionScore]
 
 
 class AnalyzeResponse(BaseModel):
@@ -33,6 +39,8 @@ class AnalyzeResponse(BaseModel):
     # Tất cả nhãn
     emotion_scores: list[LabelScore]
     hate_scores: list[LabelScore]
+    # Nhãn cảm xúc có confidence > 0.3, không thuộc safe set
+    triggered_emotions: list[str] = []
     needs_assessment: bool
     assessment: AssessmentResult | None = None
 
@@ -40,8 +48,9 @@ class AnalyzeResponse(BaseModel):
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_text(body: AnalyzeRequest):
     """
-    API 1: Nhận text từ web, chạy Module-1 gắn nhãn emotion + hate speech.
-    Nếu nhãn cần đánh giá thêm → tự động gọi Module-2 và trả kết quả luôn.
+    API 1: Nhan text tu web, chay Module-1 gan nhan emotion + hate speech.
+    Neu co nhan cam xuc > 0.3 (ngoai safe set) hoac hate != Clean
+    -> tu dong goi Module-2 voi toan bo danh sach nhan do.
     """
     result = module1.analyze(body.text)
 
@@ -50,11 +59,11 @@ async def analyze_text(body: AnalyzeRequest):
         try:
             assessment = await assess(
                 text=result['original_text'],
-                emotion=result['emotion'],
+                emotions=result['triggered_emotions'],
                 hate_speech=result['hate_speech'],
             )
         except Exception:
-            # Module-2 chưa có hoặc lỗi → vẫn trả kết quả Module-1
+            # Module-2 chua co hoac loi -> van tra ket qua Module-1
             pass
 
     return AnalyzeResponse(**result, assessment=assessment)

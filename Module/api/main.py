@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import analyze, assess
 from api.services.module1 import get_predictor
+from api.services.module2 import get_predictor as get_m2_predictor
 
 app = FastAPI(
     title="NhatKi AI Service",
@@ -30,8 +31,9 @@ app.include_router(assess.router)
 
 @app.on_event("startup")
 async def startup():
-    """Pre-load model khi server khởi động để request đầu tiên không bị chậm."""
-    get_predictor()
+    """Pre-load cả hai model khi server khởi động để request đầu tiên không bị chậm."""
+    get_predictor()       # Module-1: EmotionHatePredictor
+    get_m2_predictor()    # Module-2: MentalHealthPredictor
 
 
 @app.get("/", tags=["Health"])

@@ -227,6 +227,49 @@ export default function Journaling() {
           </div>
         )}
 
+        {/* Mental Health Assessment - chỉ hiện khi Module-2 có kết quả */}
+        {result?.needs_assessment && result?.conditions?.length > 0 && (
+          <div className="p-8 rounded-[2rem] bg-surface-container-low border border-outline-variant/20 flex flex-col gap-6 animate-in slide-in-from-bottom-4 duration-700">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>neurology</span>
+              <div>
+                <h4 className="font-bold text-on-surface">Đánh giá sức khỏe tâm thần</h4>
+                <p className="text-sm text-on-surface-variant">Các tình trạng có thể liên quan</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {result.conditions.map((c, i) => (
+                <div key={c.label} className="flex items-center gap-4">
+                  <span className={`text-xs font-bold w-5 shrink-0 ${i === 0 ? 'text-tertiary' : 'text-on-surface-variant'}`}>
+                    {i + 1}
+                  </span>
+                  <div className="flex-1">
+                    <div className="flex justify-between mb-1.5">
+                      <span className={`text-sm ${i === 0 ? 'font-semibold text-on-surface' : 'font-medium text-on-surface-variant'}`}>
+                        {c.label}
+                      </span>
+                      <span className="text-xs text-on-surface-variant tabular-nums">
+                        {Math.round(c.confidence * 100)}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-surface-variant/30 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${i === 0 ? 'bg-tertiary' : 'bg-tertiary/40'}`}
+                        style={{ width: `${Math.round(c.confidence * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-on-surface-variant/50 italic">
+              * Đây là gợi ý từ AI, không thay thế chẩn đoán y tế chuyên nghiệp.
+            </p>
+          </div>
+        )}
+
         {/* Bento Hints */}
         {!result && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
