@@ -1,8 +1,13 @@
+import asyncio
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from api.services import module1
 from api.services.module2 import assess
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Analyze"])
 
@@ -52,7 +57,8 @@ async def analyze_text(body: AnalyzeRequest):
     Neu co nhan cam xuc > 0.3 (ngoai safe set) hoac hate != Clean
     -> tu dong goi Module-2 voi toan bo danh sach nhan do.
     """
-    result = module1.analyze(body.text)
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, module1.analyze, body.text)
 
     assessment = None
     if result['needs_assessment']:
@@ -62,8 +68,7 @@ async def analyze_text(body: AnalyzeRequest):
                 emotions=result['triggered_emotions'],
                 hate_speech=result['hate_speech'],
             )
-        except Exception:
-            # Module-2 chua co hoac loi -> van tra ket qua Module-1
-            pass
+        except Exception as e:
+            logger.warning("Module-2 assessment failed: %s", e)
 
     return AnalyzeResponse(**result, assessment=assessment)

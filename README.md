@@ -28,15 +28,19 @@ Module AI (FastAPI :8001)
 
 ```
 Người dùng viết nhật ký
-    → POST /api/entries/{id}/analyze  (Backend :8000)
-    → POST /api/analyze               (Module AI :8001)
-         → Module-1: phân tích cảm xúc (7 nhãn) + hate speech (3 nhãn)
-              → Lọc: nhãn cảm xúc có confidence > 0.3 và ngoài {Enjoyment, Other}
-                     HOẶC hate speech != Clean  →  triggered_emotions
-         → Module-2: đánh giá 58 tình trạng tâm thần
-              (nhận toàn bộ triggered_emotions thay vì chỉ 1 nhãn)
-    ← Kết quả: tâm trạng + triggered_emotions + top-5 tình trạng sức khỏe tâm thần
+    → POST /api/entries/{id}/analyze       (Backend :8000)
+    → POST /api/analyze                    (Module AI :8001)
+         → Module-1: emotion (7 nhãn) + hate speech (3 nhãn)
+              → Lọc triggered_emotions: confidence > 0.3, ngoài {Enjoyment, Other}
+         → Module-2: top-5 / 58 tình trạng tâm thần  (chỉ khi needs_assessment=True)
+    ← Lưu analysis_results vào DB
+    → aggregate_user_conditions()          (Backend, chạy ngay sau)
+         → Đếm conditions 30 ngày gần nhất
+         → confirmed=True khi xuất hiện >= 3 lần
+    ← Kết quả hiển thị trên Trends
 ```
+
+> Chi tiết đầy đủ về AI pipeline: [Module/AI_PIPELINE.md](Module/AI_PIPELINE.md)
 
 ---
 
@@ -47,7 +51,7 @@ Người dùng viết nhật ký
 | **Đăng nhập / Đăng ký** | JWT auth, form validation |
 | **Journaling** | Viết nhật ký, gắn tag, chọn danh mục, phân tích AI real-time |
 | **History** | Xem lại nhật ký nhóm theo tháng, hiển thị kết quả AI |
-| **Trends** | Biểu đồ tâm trạng, streak viết, chỉ số tinh thần, cảm xúc phổ biến |
+| **Trends** | Biểu đồ tâm trạng, streak viết, chỉ số tinh thần, cảm xúc phổ biến, dự đoán tình trạng tâm thần tích lũy |
 | **Categories** | Tạo/xóa danh mục với icon và màu sắc tuỳ chỉnh |
 | **Settings** | Profile, avatar upload, nhắc nhở, giao diện |
 
@@ -220,6 +224,7 @@ Password: test123
 | GET | `/api/trends/streak` | Streak & tổng entries |
 | GET | `/api/trends/mental-index?period=month` | Chỉ số tinh thần |
 | GET | `/api/trends/top-emotions?period=week` | Cảm xúc phổ biến |
+| GET | `/api/trends/mental-health` | Tình trạng tâm thần tích lũy (confirmed / pending) |
 
 ### Users (`:8000`)
 
@@ -272,11 +277,12 @@ Password: test123
 
 ```
 users
-  └─ entries        (user_id FK)
-       ├─ entry_tags        (entry_id FK)
-       └─ analysis_results  (entry_id FK, unique)
-  └─ categories     (user_id FK)
+  └─ entries          (user_id FK)
+       ├─ entry_tags          (entry_id FK)
+       └─ analysis_results    (entry_id FK, unique)
+  └─ categories       (user_id FK)
   └─ user_preferences (user_id FK, unique)
+  └─ user_conditions  (user_id FK) — tích lũy conditions 30 ngày, confirmed >= 3 lần
 ```
 
 ### Emotion labels (Module-1)

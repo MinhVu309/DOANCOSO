@@ -3,6 +3,7 @@ Singleton wrapper cho MentalHealthPredictor (Module-2).
 Load model một lần duy nhất khi startup, tái sử dụng cho mọi request.
 """
 
+import asyncio
 import os
 from functools import lru_cache
 
@@ -27,8 +28,10 @@ def get_predictor() -> MentalHealthPredictor:
 
 async def assess(text: str, emotions: list[str], hate_speech: str) -> dict:
     """
-    Chạy Module-2 du doan tinh trang suc khoe tam than tu text.
+    Chay Module-2 du doan tinh trang suc khoe tam than tu text.
     emotions: danh sach nhan cam xuc co confidence > 0.3 tu Module-1.
     Tra ve dict { condition, confidence, severity, conditions }.
+    PyTorch inference chay trong thread pool de khong block event loop.
     """
-    return get_predictor().predict(text, top_k=5)
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, lambda: get_predictor().predict(text, top_k=5))
