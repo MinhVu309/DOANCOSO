@@ -14,10 +14,17 @@ MODEL_PATH     = os.path.join(BASE_DIR, 'Model', 'best_multitask_model.pth')
 THRESHOLD_PATH = os.path.join(BASE_DIR, 'Model', 'emotion_thresholds.json')
 DICT_PATH      = os.path.join(BASE_DIR, 'data', 'Xử lý teencode.xlsx')
 
-# Cảm xúc tích cực / trung tính — không cần gửi sang Module-2
+# Tích cực + Nhận thức + Trung lập — không trigger Module-2
+# Chỉ nhóm Tiêu cực (fear, nervousness, remorse, embarrassment,
+# disappointment, sadness, grief, disgust, anger, annoyance, disapproval)
+# mới gọi Module-2 (theo Bảng 3 ViGoEmotions).
 SAFE_EMOTIONS = {
+    # Tích cực
     'amusement', 'excitement', 'joy', 'love', 'desire', 'optimism',
     'caring', 'pride', 'admiration', 'gratitude', 'relief', 'approval',
+    # Nhận thức
+    'realization', 'surprise', 'curiosity', 'confusion',
+    # Trung lập
     'neutral',
 }
 SAFE_HATE_LABEL = 'Clean'
