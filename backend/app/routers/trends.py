@@ -7,12 +7,29 @@ from ..routers.auth import get_current_user
 from ..schemas.trends import (
     MoodChartResponse, StreakResponse,
     MentalIndexResponse, TopEmotionsResponse,
-    MentalHealthSummaryResponse,
+    MentalHealthSummaryResponse, WarningDisclaimer,
 )
 from ..services import trends_service
-from ..services.condition_service import get_user_conditions, CONDITION_WINDOW_DAYS, CONDITION_MIN_OCCURRENCES
+from ..services.condition_service import (
+    get_user_conditions,
+    CONDITION_WINDOW_DAYS,
+)
 
 router = APIRouter(prefix="/api/trends", tags=["Trends"])
+
+# Mandatory disclaimer per [1] APA DSM-5-TR (2022) and [2] WHO ICD-11 CDDR (2024).
+# Must accompany every response that carries warning_level fields.
+_WARNING_DISCLAIMER = WarningDisclaimer(
+    vi=(
+        "Kết quả này được tạo bởi AI dựa trên tín hiệu từ nhật ký của bạn. "
+        "Đây KHÔNG phải chẩn đoán lâm sàng. Chẩn đoán chính thức yêu cầu "
+        "đánh giá bởi chuyên gia tâm lý hoặc bác sĩ tâm thần có chuyên môn."
+    ),
+    source=(
+        "Per [1] APA DSM-5-TR (2022) and [2] WHO ICD-11 CDDR (2024): "
+        "diagnosis requires clinician evaluation, not AI screening alone."
+    ),
+)
 
 
 @router.get("/mood-chart", response_model=MoodChartResponse)
@@ -56,12 +73,20 @@ def mental_health_summary(
     db: Session = Depends(get_db),
 ):
     """
-    Tra ve danh sach tinh trang tam than duoc tich luy tu nhieu bai viet.
-    confirmed=True khi xuat hien >= 3 lan trong 30 ngay gan nhat.
+    Returns accumulated mental-health conditions with DSM-5/ICD-11 warning levels.
+
+    warning_level semantics (per [3] Reed et al. 2019 ICD-11 utility framework):
+      'watch'  — subthreshold, frequency/duration not yet at clinical threshold
+      'alert'  — approaching threshold, self-care resources recommended
+      'urgent' — meets / exceeds DSM-5 [1] or ICD-11 [2] threshold,
+                 professional evaluation strongly recommended
+
+    Response always includes a disclaimer confirming this is AI screening,
+    not a clinical diagnosis [1][2].
     """
     conditions = get_user_conditions(db, current_user.id)
     return MentalHealthSummaryResponse(
         window_days=CONDITION_WINDOW_DAYS,
-        min_occurrences=CONDITION_MIN_OCCURRENCES,
         conditions=conditions,
+        disclaimer=_WARNING_DISCLAIMER,
     )

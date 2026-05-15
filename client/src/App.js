@@ -7,6 +7,8 @@ import History from './pages/History';
 import Trends from './pages/Trends';
 import Categories from './pages/Categories';
 import Settings from './pages/Settings';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import PrivateAdminRoute from './components/PrivateAdminRoute';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -39,6 +41,14 @@ function AppRoutes() {
         <Route path="categories" element={<Categories />} />
         <Route path="settings" element={<Settings />} />
       </Route>
+      <Route
+        path="/admin"
+        element={
+          <PrivateAdminRoute>
+            <AdminDashboard />
+          </PrivateAdminRoute>
+        }
+      />
     </Routes>
   );
 }

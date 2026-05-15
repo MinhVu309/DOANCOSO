@@ -17,10 +17,10 @@ NhatKi/
 ```
 Frontend (React :3000)
     ↕ REST + JWT
-Backend (FastAPI :8000)      — auth, entries, categories, trends, users
+Backend (FastAPI :8000)      — auth, entries, categories, trends, admin, users
     ↕ HTTP (httpx)
 Module AI (FastAPI :8001)
-    ├── Module-1             — emotion (7 nhãn) + hate speech (3 nhãn)
+    ├── Module-1             — emotion (28 nhãn ViGoEmotions) + hate speech (3 nhãn)
     └── Module-2             — đánh giá 58 tình trạng sức khỏe tâm thần
 ```
 
@@ -51,9 +51,10 @@ Người dùng viết nhật ký
 | **Đăng nhập / Đăng ký** | JWT auth, form validation |
 | **Journaling** | Viết nhật ký, gắn tag, chọn danh mục, phân tích AI real-time |
 | **History** | Xem lại nhật ký nhóm theo tháng, hiển thị kết quả AI |
-| **Trends** | Biểu đồ tâm trạng, streak viết, chỉ số tinh thần, cảm xúc phổ biến, dự đoán tình trạng tâm thần tích lũy |
+| **Trends** | Biểu đồ tâm trạng, streak viết, chỉ số tinh thần, cảm xúc phổ biến, cảnh báo sức khỏe tâm thần (DSM-5/ICD-11) |
 | **Categories** | Tạo/xóa danh mục với icon và màu sắc tuỳ chỉnh |
 | **Settings** | Profile, avatar upload, nhắc nhở, giao diện |
+| **Admin Dashboard** | Thống kê nền tảng, quản lý user, kích hoạt/vô hiệu hóa tài khoản (role=admin) |
 
 ---
 
@@ -73,9 +74,9 @@ Người dùng viết nhật ký
 - **httpx** — async HTTP client gọi Module AI
 
 ### AI Service (`Module/`)
-- **PhoBERT** (`vinai/phobert-base`) — Vietnamese NLP backbone
-- **Module-1** — Multi-task model: emotion (7 nhãn) + hate speech (3 nhãn)
-- **Module-2** — Multi-label model: 58 tình trạng sức khỏe tâm thần
+- **PhoBERT** (`vinai/phobert-base-v2`) — Vietnamese NLP backbone
+- **Module-1** — Multi-task model: emotion (28 label ViGoEmotions) + hate speech (3 label), per-label threshold
+- **Module-2** — Multi-label model: 58 tinh trang suc khoe tam than
 - **PyTorch** + **FastAPI**
 
 ### Infrastructure
@@ -94,9 +95,10 @@ Người dùng viết nhật ký
 Đặt vào `Module/Model/`:
 ```
 Module/Model/
-├── best_multitask_model.pth         # Module-1 (~517MB)
+├── best_multitask_model.pth          # Module-1 (~517MB)
 ├── best_mental_health_multilabel.pth # Module-2 (~516MB)
-└── label_names.pkl                  # 58 nhãn tình trạng tâm thần
+├── label_names.pkl                   # 58 label tinh trang tam than
+└── emotion_thresholds.json           # Per-label threshold 28 ViGoEmotions
 ```
 
 ---
@@ -146,7 +148,7 @@ Backend: http://localhost:8000 | Swagger: http://localhost:8000/docs
 
 ### 3. Module AI Service
 
-> Cần có đủ 3 file model trong `Module/Model/` trước khi chạy.
+> Cần có đủ 4 file model trong `Module/Model/` trước khi chạy.
 
 ```bash
 cd Module
@@ -178,10 +180,17 @@ Frontend: http://localhost:3000
 
 ## Tài khoản test (sau khi seed)
 
+```bash
+# Chạy từ backend/
+source venv/bin/activate && python seed_demo.py
 ```
-Email:    test@nhatki.app
-Password: test123
+
 ```
+Email:    demo@nhatki.vn
+Password: Demo@123
+```
+
+> Seed script tạo entries trải rộng 30 ngày, bao phủ đủ 3 bậc cảnh báo DSM-5/ICD-11 (watch / alert / urgent) để test trang Trends.
 
 ---
 
@@ -194,6 +203,14 @@ Password: test123
 | POST | `/api/auth/register` | — | Đăng ký |
 | POST | `/api/auth/login` | — | Đăng nhập → JWT |
 | GET | `/api/auth/me` | Bearer | Thông tin user |
+
+### Admin (`:8000`, role=admin)
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/api/admin/stats` | Tong so user, entry, analysis + moi trong tuan |
+| GET | `/api/admin/users?page&limit&search` | Danh sach tat ca user |
+| PATCH | `/api/admin/users/{id}/toggle-active` | Kich hoat / vo hieu hoa tai khoan |
 
 ### Entries (`:8000`)
 
@@ -220,11 +237,11 @@ Password: test123
 
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET | `/api/trends/mood-chart?period=week\|month` | Biểu đồ tâm trạng |
-| GET | `/api/trends/streak` | Streak & tổng entries |
-| GET | `/api/trends/mental-index?period=month` | Chỉ số tinh thần |
-| GET | `/api/trends/top-emotions?period=week` | Cảm xúc phổ biến |
-| GET | `/api/trends/mental-health` | Tình trạng tâm thần tích lũy (confirmed / pending) |
+| GET | `/api/trends/mood-chart?period=week\|month` | Bieu do tam trang |
+| GET | `/api/trends/streak` | Streak & tong entries |
+| GET | `/api/trends/mental-index?period=month` | Chi so tinh than |
+| GET | `/api/trends/top-emotions?period=week` | Cam xuc pho bien |
+| GET | `/api/trends/mental-health` | Tinh trang tam than tich luy (warning_level, dsm5_code, icd11_code) |
 
 ### Users (`:8000`)
 
@@ -244,28 +261,27 @@ Password: test123
 | POST | `/api/analyze` | Module-1 phân tích → nếu có nhãn > 0.3 tự gọi Module-2 |
 | POST | `/api/assess` | Module-2 trực tiếp (nhận `emotions: list[str]`) |
 
-**Ví dụ response `/api/analyze`:**
+**Vi du response `/api/analyze`:**
 ```json
 {
-  "emotion": "Sadness",
+  "emotion": "sadness",
   "emotion_confidence": 0.82,
   "hate_speech": "Clean",
   "hate_confidence": 0.91,
   "emotion_scores": [
-    { "label": "Sadness",   "confidence": 0.82 },
-    { "label": "Fear",      "confidence": 0.41 },
-    { "label": "Anger",     "confidence": 0.28 },
-    { "label": "Enjoyment", "confidence": 0.06 }
+    { "label": "sadness",      "confidence": 0.82 },
+    { "label": "grief",        "confidence": 0.54 },
+    { "label": "disappointment","confidence": 0.47 }
   ],
-  "triggered_emotions": ["Sadness", "Fear"],
+  "triggered_emotions": ["sadness", "grief"],
   "needs_assessment": true,
   "assessment": {
-    "condition": "Rối loạn trầm cảm",
+    "condition": "Roi loan tram cam",
     "confidence": 0.87,
     "conditions": [
-      { "label": "Rối loạn trầm cảm", "confidence": 0.87 },
-      { "label": "Mất ngủ",           "confidence": 0.65 },
-      { "label": "Rối loạn lo âu",    "confidence": 0.58 }
+      { "label": "Roi loan tram cam", "confidence": 0.87 },
+      { "label": "Mat ngu",           "confidence": 0.65 },
+      { "label": "Roi loan lo au",    "confidence": 0.58 }
     ]
   }
 }
@@ -276,17 +292,19 @@ Password: test123
 ## Database Schema
 
 ```
-users
+users  [id, email, username, role("user"|"admin"), is_active, ...]
   └─ entries          (user_id FK)
        ├─ entry_tags          (entry_id FK)
        └─ analysis_results    (entry_id FK, unique)
   └─ categories       (user_id FK)
   └─ user_preferences (user_id FK, unique)
-  └─ user_conditions  (user_id FK) — tích lũy conditions 30 ngày, confirmed >= 3 lần
+  └─ user_conditions  (user_id FK)
+       — occurrence_count, avg_confidence, warning_level, intensity_score,
+         consecutive_days, within_window_days, dsm5_code, icd11_code
 ```
 
-### Emotion labels (Module-1)
-`Anger · Disgust · Enjoyment · Fear · Other · Sadness · Surprise`
+### Emotion labels — Module-1 (28 ViGoEmotions)
+`amusement · excitement · joy · love · desire · optimism · caring · pride · admiration · gratitude · relief · approval · realization · surprise · curiosity · confusion · fear · nervousness · remorse · embarrassment · disappointment · sadness · grief · disgust · anger · annoyance · disapproval · neutral`
 
 ### Hate speech labels (Module-1)
 `Clean · Offensive · Hate`

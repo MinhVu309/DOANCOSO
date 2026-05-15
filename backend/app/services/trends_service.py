@@ -128,9 +128,9 @@ def get_mental_index(db: Session, user_id: int, period: str = "month") -> Mental
         )
         return float(rows) if rows else 0.0
 
-    stress_score = avg_score("Anger", "Fear")
-    anxiety_score = avg_score("Fear")
-    depression_score = avg_score("Sadness")
+    stress_score = avg_score("anger", "fear", "annoyance", "nervousness")
+    anxiety_score = avg_score("fear", "nervousness")
+    depression_score = avg_score("sadness", "grief", "disappointment")
 
     return MentalIndexResponse(
         stress_level=_score_to_level(stress_score),

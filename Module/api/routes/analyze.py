@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from api.services import module1
@@ -36,15 +36,16 @@ class AssessmentResult(BaseModel):
 class AnalyzeResponse(BaseModel):
     original_text: str
     cleaned_text: str
-    # Nhãn chính (top-1)
-    emotion: str
-    emotion_confidence: float
+    # Multi-label emotions (28 nhan ViGoEmotions, score > per-label threshold)
+    emotions: list[str]
+    emotion_scores: list[LabelScore]
+    # Hate speech
+    hate: str
+    hate_score: float
+    # Backward-compat aliases (backend doc cu dung)
     hate_speech: str
     hate_confidence: float
-    # Tất cả nhãn
-    emotion_scores: list[LabelScore]
-    hate_scores: list[LabelScore]
-    # Nhãn cảm xúc có confidence > 0.3, không thuộc safe set
+    # Triggered emotions + assessment flag
     triggered_emotions: list[str] = []
     needs_assessment: bool
     assessment: AssessmentResult | None = None
@@ -53,9 +54,8 @@ class AnalyzeResponse(BaseModel):
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_text(body: AnalyzeRequest):
     """
-    API 1: Nhan text tu web, chay Module-1 gan nhan emotion + hate speech.
-    Neu co nhan cam xuc > 0.3 (ngoai safe set) hoac hate != Clean
-    -> tu dong goi Module-2 voi toan bo danh sach nhan do.
+    Nhan text, chay Module-1 phan tich emotion (28 nhan, multi-label) + hate speech.
+    Neu co nhan cam xuc ngoai safe set hoac hate != Clean -> goi Module-2.
     """
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, module1.analyze, body.text)
@@ -66,7 +66,7 @@ async def analyze_text(body: AnalyzeRequest):
             assessment = await assess(
                 text=result['original_text'],
                 emotions=result['triggered_emotions'],
-                hate_speech=result['hate_speech'],
+                hate_speech=result['hate'],
             )
         except Exception as e:
             logger.warning("Module-2 assessment failed: %s", e)

@@ -1,6 +1,6 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class ConditionScore(BaseModel):
@@ -23,3 +23,13 @@ class AnalysisResultResponse(BaseModel):
     condition_confidence: Optional[float] = None
     conditions: Optional[List[ConditionScore]] = None
     analyzed_at: datetime
+    # raw_response dung de lay danh sach day du cac cam xuc (emotions list)
+    raw_response: Optional[Dict[str, Any]] = None
+
+    @field_validator("raw_response", mode="before")
+    @classmethod
+    def _drop_heavy_fields(cls, v):
+        """Chi giu lai truong emotions tu raw_response de giam payload."""
+        if not isinstance(v, dict):
+            return None
+        return {"emotions": v.get("emotions", [])} if v.get("emotions") else None

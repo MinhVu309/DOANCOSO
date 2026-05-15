@@ -8,8 +8,23 @@ from ..constants import EMOTION_MAPPING, AI_SUMMARY_TEMPLATES, AI_TAGS_BY_EMOTIO
 from ..models.analysis_result import AnalysisResult
 from .condition_service import aggregate_user_conditions
 
-EMOTION_MIN_CONFIDENCE = 0.4
-HATE_MIN_CONFIDENCE    = 0.5
+HATE_MIN_CONFIDENCE = 0.5
+
+# Map nhan 28-label sang nhom cu de generate summary/tags van dung duoc
+_EMOTION_TO_SUMMARY_GROUP: dict[str, str] = {
+    'amusement': 'Enjoyment', 'excitement': 'Enjoyment', 'joy': 'Enjoyment',
+    'love': 'Enjoyment', 'desire': 'Enjoyment', 'optimism': 'Enjoyment',
+    'caring': 'Enjoyment', 'pride': 'Enjoyment', 'admiration': 'Enjoyment',
+    'gratitude': 'Enjoyment', 'relief': 'Enjoyment', 'approval': 'Enjoyment',
+    'realization': 'Surprise', 'surprise': 'Surprise', 'curiosity': 'Surprise',
+    'confusion': 'Other',
+    'fear': 'Fear', 'nervousness': 'Fear',
+    'remorse': 'Sadness', 'embarrassment': 'Sadness', 'disappointment': 'Sadness',
+    'sadness': 'Sadness', 'grief': 'Sadness',
+    'disgust': 'Disgust', 'disapproval': 'Disgust',
+    'anger': 'Anger', 'annoyance': 'Anger',
+    'neutral': 'Other',
+}
 
 
 async def analyze_entry(db: Session, entry_id: UUID) -> AnalysisResult:
@@ -33,14 +48,20 @@ async def analyze_entry(db: Session, entry_id: UUID) -> AnalysisResult:
         # Module-1 unavailable — store empty result so entry is still saved
         return _upsert_empty_analysis(db, entry_id)
 
-    emotion_label: str = raw.get("emotion", "Other")
-    emotion_score: float = raw.get("emotion_confidence", 0.0)
-    hate_label: str = raw.get("hate_speech", "Clean")
-    hate_score: float = raw.get("hate_confidence", 0.0)
+    # Module-1 ver 2.6: multi-label emotions (list), hate / hate_score
+    emotions: list = raw.get("emotions", [])
+    emotion_label: str = emotions[0] if emotions else "neutral"
 
-    # Áp ngưỡng min confidence — dưới ngưỡng thì fallback về nhãn an toàn
-    if emotion_score < EMOTION_MIN_CONFIDENCE:
-        emotion_label = "Other"
+    # Lay score cua primary emotion tu emotion_scores list
+    emotion_scores_list: list = raw.get("emotion_scores", [])
+    emotion_score: float = next(
+        (s["confidence"] for s in emotion_scores_list if s["label"] == emotion_label),
+        0.0,
+    )
+
+    hate_label: str = raw.get("hate", raw.get("hate_speech", "Clean"))
+    hate_score: float = raw.get("hate_score", raw.get("hate_confidence", 0.0))
+
     if hate_score < HATE_MIN_CONFIDENCE:
         hate_label = "Clean"
 
@@ -52,11 +73,12 @@ async def analyze_entry(db: Session, entry_id: UUID) -> AnalysisResult:
     severity = assessment.get("severity")
     conditions = assessment.get("conditions")  # top-5 list từ Module-2
 
-    mapping = EMOTION_MAPPING.get(emotion_label, EMOTION_MAPPING["Other"])
+    summary_group = _EMOTION_TO_SUMMARY_GROUP.get(emotion_label, "Other")
+    mapping = EMOTION_MAPPING.get(summary_group, EMOTION_MAPPING["Other"])
     mood_label_vi = mapping["vi"]
     mood_color = mapping["color"]
-    ai_summary = generate_ai_summary(emotion_label, hate_label)
-    ai_tags = AI_TAGS_BY_EMOTION.get(emotion_label, [])
+    ai_summary = generate_ai_summary(summary_group, hate_label)
+    ai_tags = AI_TAGS_BY_EMOTION.get(summary_group, [])
 
     # Upsert: delete existing if any, then insert
     existing = db.query(AnalysisResult).filter(AnalysisResult.entry_id == entry_id).first()
@@ -104,7 +126,7 @@ def _upsert_empty_analysis(db: Session, entry_id: UUID) -> AnalysisResult:
     mapping = EMOTION_MAPPING["Other"]
     result = AnalysisResult(
         entry_id=entry_id,
-        emotion_label="Other",
+        emotion_label="neutral",
         emotion_score=0.0,
         hate_label="Clean",
         hate_score=0.0,

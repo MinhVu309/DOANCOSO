@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import engine, Base
-from .routers import auth, entries, categories, trends, users
+from .routers import auth, entries, categories, trends, users, admin
 
 # Tạo bảng tự động (dùng cho dev)
 # Khi Alembic ổn định thì bỏ dòng này
@@ -35,6 +35,7 @@ app.include_router(entries.router)
 app.include_router(categories.router)
 app.include_router(trends.router)
 app.include_router(users.router)
+app.include_router(admin.router)
 
 
 @app.get("/", tags=["Health"])

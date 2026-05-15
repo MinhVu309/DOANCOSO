@@ -1,46 +1,44 @@
+import torch
 import torch.nn as nn
 from transformers import AutoModel
-import torch
+
 
 class PhoBERTMultiTask(nn.Module):
-    def __init__(self, num_emotion_labels, num_hate_labels):
-        super(PhoBERTMultiTask, self).__init__()
-        # Backbone PhoBERT
-        self.phobert = AutoModel.from_pretrained("vinai/phobert-base", use_safetensors=True)
-        
-        hidden_size = self.phobert.config.hidden_size # Thường là 768
-        intermediate_size = 256 # Kích thước lớp ẩn trung gian
+    def __init__(self, num_hate_labels=3, num_emotion_labels=28):
+        super().__init__()
+        self.phobert = AutoModel.from_pretrained("vinai/phobert-base-v2", use_safetensors=True)
+        hidden_size = 768
 
-        # --- Nâng cấp Head cho Emotion ---
+        # Emotion head — khớp đúng checkpoint: Sequential 3 Linear (768→384→256→28)
+        # State-dict keys: 0.*, 3.*, 6.*  (GELU+Dropout không có weight → index 1,2 và 4,5)
         self.emotion_head = nn.Sequential(
-            nn.Linear(hidden_size, intermediate_size),
-            nn.BatchNorm1d(intermediate_size), # Giúp mô hình hội tụ nhanh và ổn định
-            nn.ReLU(),
-            nn.Dropout(0.3), # Giảm hiện tượng học vẹt (overfitting)
-            nn.Linear(intermediate_size, num_emotion_labels)
+            nn.Linear(hidden_size, 384),  # index 0
+            nn.GELU(),                    # index 1 (no params)
+            nn.Dropout(0.4),              # index 2 (no params)
+            nn.Linear(384, 256),          # index 3
+            nn.GELU(),                    # index 4 (no params)
+            nn.Dropout(0.4),              # index 5 (no params)
+            nn.Linear(256, num_emotion_labels),  # index 6
         )
 
-        # --- Nâng cấp Head cho Hate Speech ---
+        # Hate head — khớp đúng checkpoint: Linear+BatchNorm+ReLU+Dropout+Linear
+        # State-dict keys: 0.*, 1.* (BatchNorm), 4.*
         self.hate_head = nn.Sequential(
-            nn.Linear(hidden_size, intermediate_size),
-            nn.BatchNorm1d(intermediate_size),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(intermediate_size, num_hate_labels)
+            nn.Linear(hidden_size, 256),  # index 0
+            nn.BatchNorm1d(256),          # index 1
+            nn.ReLU(),                    # index 2 (no params)
+            nn.Dropout(0.3),              # index 3 (no params)
+            nn.Linear(256, num_hate_labels),  # index 4
         )
 
     def forward(self, input_ids, attention_mask):
         outputs = self.phobert(input_ids=input_ids, attention_mask=attention_mask)
-        last_hidden_state = outputs.last_hidden_state # [batch, seq_len, 768]
 
-        # --- Kỹ thuật Mean Pooling ---
-        # Tạo mask để không tính trung bình trên các token Padding
-        input_mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
-        sum_embeddings = torch.sum(last_hidden_state * input_mask_expanded, 1)
-        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-        mean_pooled = sum_embeddings / sum_mask
+        # Mean pooling
+        last_hidden = outputs.last_hidden_state
+        mask_exp = attention_mask.unsqueeze(-1).expand(last_hidden.size()).float()
+        pooled = torch.sum(last_hidden * mask_exp, 1) / torch.clamp(mask_exp.sum(1), min=1e-9)
 
-        emo_logits = self.emotion_head(mean_pooled)
-        hate_logits = self.hate_head(mean_pooled)
-
+        emo_logits = self.emotion_head(pooled)
+        hate_logits = self.hate_head(pooled)
         return emo_logits, hate_logits

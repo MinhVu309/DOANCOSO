@@ -55,6 +55,19 @@ export default function Sidebar() {
 
       {/* Settings & Logout */}
       <div className="flex flex-col gap-2 pt-6 border-t border-outline-variant/30">
+        {user?.role === 'admin' && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              `flex items-center gap-4 px-4 py-2 transition-all duration-300 ease-out ${
+                isActive ? 'text-primary font-medium' : 'text-on-surface-variant hover:text-primary hover:translate-x-1'
+              }`
+            }
+          >
+            <span className="material-symbols-outlined">admin_panel_settings</span>
+            <span className="text-sm">Admin</span>
+          </NavLink>
+        )}
         <NavLink
           to="/settings"
           className={({ isActive }) =>

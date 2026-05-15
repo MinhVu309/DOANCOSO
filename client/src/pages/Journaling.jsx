@@ -1,14 +1,71 @@
 import { useState, useEffect } from 'react';
 import client from '../api/client';
 
+// 28 ViGoEmotions → Material Symbols icon
 const MOOD_ICON = {
-  Enjoyment: 'sentiment_very_satisfied',
-  Sadness: 'sentiment_sad',
-  Anger: 'sentiment_stressed',
-  Fear: 'sentiment_worried',
-  Disgust: 'sentiment_dissatisfied',
-  Surprise: 'sentiment_excited',
-  Other: 'sentiment_neutral',
+  // Tích cực
+  amusement: 'sentiment_very_satisfied', excitement: 'sentiment_very_satisfied',
+  joy: 'sentiment_very_satisfied', love: 'favorite', desire: 'sentiment_satisfied',
+  optimism: 'sentiment_satisfied', caring: 'volunteer_activism',
+  pride: 'emoji_events', admiration: 'star', gratitude: 'sentiment_very_satisfied',
+  relief: 'sentiment_satisfied', approval: 'thumb_up',
+  // Trung tính / bất ngờ
+  realization: 'lightbulb', surprise: 'sentiment_excited',
+  curiosity: 'search', confusion: 'help', neutral: 'sentiment_neutral',
+  // Lo lắng / sợ
+  fear: 'sentiment_worried', nervousness: 'sentiment_worried',
+  // Buồn bã
+  remorse: 'sentiment_sad', embarrassment: 'sentiment_sad',
+  disappointment: 'sentiment_sad', sadness: 'sentiment_sad', grief: 'sentiment_sad',
+  // Tiêu cực
+  disgust: 'sentiment_dissatisfied', disapproval: 'thumb_down',
+  anger: 'sentiment_stressed', annoyance: 'sentiment_stressed',
+};
+
+// Tên tiếng Việt casual cho từng nhãn (hiện trong chip cảm xúc)
+const EMOTION_VI = {
+  amusement: 'Vui vẻ', excitement: 'Hứng khởi', joy: 'Hạnh phúc',
+  love: 'Yêu thương', desire: 'Khao khát', optimism: 'Lạc quan',
+  caring: 'Quan tâm', pride: 'Tự hào', admiration: 'Ngưỡng mộ',
+  gratitude: 'Biết ơn', relief: 'Nhẹ nhõm', approval: 'Đồng tình',
+  realization: 'Nhận ra', surprise: 'Ngạc nhiên', curiosity: 'Tò mò',
+  confusion: 'Bối rối', fear: 'Lo âu', nervousness: 'Hồi hộp',
+  remorse: 'Hối hận', embarrassment: 'Xấu hổ', disappointment: 'Thất vọng',
+  sadness: 'Buồn bã', grief: 'Đau khổ', disgust: 'Chán nản',
+  anger: 'Tức giận', annoyance: 'Khó chịu', disapproval: 'Phản đối',
+  neutral: 'Bình yên',
+};
+
+// Màu chip theo nhóm cảm xúc
+const EMOTION_CHIP_CLASS = {
+  amusement: 'bg-green-50 text-green-700 border-green-200',
+  excitement: 'bg-green-50 text-green-700 border-green-200',
+  joy: 'bg-green-50 text-green-700 border-green-200',
+  love: 'bg-pink-50 text-pink-700 border-pink-200',
+  desire: 'bg-green-50 text-green-700 border-green-200',
+  optimism: 'bg-green-50 text-green-700 border-green-200',
+  caring: 'bg-green-50 text-green-700 border-green-200',
+  pride: 'bg-green-50 text-green-700 border-green-200',
+  admiration: 'bg-green-50 text-green-700 border-green-200',
+  gratitude: 'bg-green-50 text-green-700 border-green-200',
+  relief: 'bg-green-50 text-green-700 border-green-200',
+  approval: 'bg-green-50 text-green-700 border-green-200',
+  realization: 'bg-purple-50 text-purple-700 border-purple-200',
+  surprise: 'bg-purple-50 text-purple-700 border-purple-200',
+  curiosity: 'bg-purple-50 text-purple-700 border-purple-200',
+  confusion: 'bg-gray-100 text-gray-600 border-gray-300',
+  neutral: 'bg-gray-100 text-gray-600 border-gray-300',
+  fear: 'bg-orange-50 text-orange-700 border-orange-200',
+  nervousness: 'bg-orange-50 text-orange-700 border-orange-200',
+  remorse: 'bg-blue-50 text-blue-700 border-blue-200',
+  embarrassment: 'bg-blue-50 text-blue-700 border-blue-200',
+  disappointment: 'bg-blue-50 text-blue-700 border-blue-200',
+  sadness: 'bg-blue-50 text-blue-700 border-blue-200',
+  grief: 'bg-blue-50 text-blue-700 border-blue-200',
+  disgust: 'bg-amber-50 text-amber-700 border-amber-200',
+  disapproval: 'bg-amber-50 text-amber-700 border-amber-200',
+  anger: 'bg-red-50 text-red-700 border-red-200',
+  annoyance: 'bg-red-50 text-red-700 border-red-200',
 };
 
 export default function Journaling() {
@@ -173,59 +230,84 @@ export default function Journaling() {
         )}
 
         {/* Analysis Result */}
-        {result && (
-          <div className="p-8 rounded-[2rem] bg-surface-container-low border border-outline-variant/20 flex flex-col gap-6 animate-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                {MOOD_ICON[result.emotion_label] || 'sentiment_neutral'}
-              </span>
-              <div>
-                <h4 className="font-bold text-on-surface">Kết quả phân tích</h4>
-                <p className="text-sm text-on-surface-variant">AI đã đọc và hiểu nhật ký của bạn</p>
-              </div>
-              {saved && (
-                <div className="ml-auto flex items-center gap-1.5 text-xs text-primary">
-                  <span className="material-symbols-outlined text-base">check_circle</span>
-                  Đã lưu
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-4">
-              <div className="flex flex-col items-center px-6 py-4 bg-surface-container rounded-2xl">
-                <span className="text-2xl font-black text-primary">{result.mood_label_vi}</span>
-                <span className="text-xs text-on-surface-variant mt-1">Tâm trạng</span>
-              </div>
-              <div className="flex flex-col items-center px-6 py-4 bg-surface-container rounded-2xl">
-                <span className="text-2xl font-black text-on-surface">
-                  {Math.round(result.emotion_score * 100)}%
+        {result && (() => {
+          const emotions = result.raw_response?.emotions?.length > 0
+            ? result.raw_response.emotions
+            : [result.emotion_label].filter(Boolean);
+          const primaryEmotion = emotions[0] || 'neutral';
+          return (
+            <div className="p-8 rounded-[2rem] bg-surface-container-low border border-outline-variant/20 flex flex-col gap-6 animate-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  {MOOD_ICON[primaryEmotion] || 'sentiment_neutral'}
                 </span>
-                <span className="text-xs text-on-surface-variant mt-1">Độ chắc chắn</span>
+                <div>
+                  <h4 className="font-bold text-on-surface">Kết quả phân tích</h4>
+                  <p className="text-sm text-on-surface-variant">AI đã đọc và hiểu nhật ký của bạn</p>
+                </div>
+                {saved && (
+                  <div className="ml-auto flex items-center gap-1.5 text-xs text-primary">
+                    <span className="material-symbols-outlined text-base">check_circle</span>
+                    Đã lưu
+                  </div>
+                )}
               </div>
-              {result.hate_label !== 'Clean' && (
-                <div className="flex flex-col items-center px-6 py-4 bg-error/5 border border-error/20 rounded-2xl">
-                  <span className="text-sm font-bold text-error">{result.hate_label}</span>
-                  <span className="text-xs text-on-surface-variant mt-1">Nội dung</span>
+
+              {/* Mood label + hate badge */}
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex flex-col items-center px-6 py-4 bg-surface-container rounded-2xl">
+                  <span className="text-2xl font-black text-primary">{result.mood_label_vi}</span>
+                  <span className="text-xs text-on-surface-variant mt-1">Tâm trạng tổng thể</span>
+                </div>
+                {result.hate_label !== 'Clean' && (
+                  <div className="flex flex-col items-center px-6 py-4 bg-error/5 border border-error/20 rounded-2xl">
+                    <span className="text-sm font-bold text-error">{result.hate_label}</span>
+                    <span className="text-xs text-on-surface-variant mt-1">Nội dung</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Multi-label emotion chips */}
+              {emotions.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">
+                    Cảm xúc được phát hiện
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {emotions.map(e => (
+                      <span
+                        key={e}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold ${
+                          EMOTION_CHIP_CLASS[e] || 'bg-surface-container text-on-surface border-outline-variant/30'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
+                          {MOOD_ICON[e] || 'circle'}
+                        </span>
+                        {EMOTION_VI[e] || e}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="p-4 bg-surface-container/80 rounded-2xl flex items-start gap-3 border border-outline-variant/20">
+                <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+                <p className="text-sm italic text-on-surface-variant">{result.ai_summary}</p>
+              </div>
+
+              {result.ai_tags?.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {result.ai_tags.map(tag => (
+                    <span key={tag} className="px-3 py-1 bg-surface-container text-[10px] font-bold uppercase tracking-widest rounded-full text-on-primary-fixed-variant border border-outline-variant/30">
+                      {tag}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
-
-            <div className="p-4 bg-surface-container/80 rounded-2xl flex items-start gap-3 border border-outline-variant/20">
-              <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-              <p className="text-sm italic text-on-surface-variant">{result.ai_summary}</p>
-            </div>
-
-            {result.ai_tags?.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {result.ai_tags.map(tag => (
-                  <span key={tag} className="px-3 py-1 bg-surface-container text-[10px] font-bold uppercase tracking-widest rounded-full text-on-primary-fixed-variant border border-outline-variant/30">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* Mental Health Assessment - chỉ hiện khi Module-2 có kết quả */}
         {result?.needs_assessment && result?.conditions?.length > 0 && (

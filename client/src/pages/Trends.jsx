@@ -33,29 +33,23 @@ function getLevelColor(level) {
   return level === 'Cao' ? 'bg-error' : level === 'Trung bình' ? 'bg-tertiary' : 'bg-primary';
 }
 
+const WARNING_CONFIG = {
+  watch:  { label: 'Theo dõi',  classes: 'bg-primary-container text-on-primary-container' },
+  alert:  { label: 'Chú ý',     classes: 'bg-tertiary-container text-on-tertiary-container' },
+  urgent: { label: 'Khẩn cấp',  classes: 'bg-error text-on-error' },
+};
+
 function formatDate(isoString) {
   if (!isoString) return '—';
   const d = new Date(isoString);
   return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
 }
 
-function ConditionProgressDots({ count, max }) {
-  return (
-    <span className="flex gap-1 items-center">
-      {Array.from({ length: max }).map((_, i) => (
-        <span
-          key={i}
-          className={`w-2 h-2 rounded-full transition-all ${
-            i < count ? 'bg-current opacity-100' : 'bg-current opacity-20'
-          }`}
-        />
-      ))}
-    </span>
-  );
-}
 
-function ConditionCard({ item, minOccurrences }) {
+function ConditionCard({ item }) {
   const isConfirmed = item.confirmed;
+  const warnCfg = WARNING_CONFIG[item.warning_level];
+  const hasCodes = item.dsm5_code || item.icd11_code;
 
   return (
     <div className={`flex items-start gap-4 p-5 rounded-2xl border transition-all ${
@@ -81,23 +75,33 @@ function ConditionCard({ item, minOccurrences }) {
           }`}>
             {isConfirmed ? 'Cần chú ý' : 'Đang theo dõi'}
           </span>
+          {warnCfg && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${warnCfg.classes}`}>
+              {warnCfg.label}
+            </span>
+          )}
           <span className="font-bold text-sm truncate">{item.condition_name}</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-          <span className="flex items-center gap-1.5">
-            <ConditionProgressDots count={item.occurrence_count} max={Math.max(item.occurrence_count, minOccurrences)} />
-            <span className="font-semibold">
-              {item.occurrence_count}/{minOccurrences} lần
-            </span>
-          </span>
+          <span className="font-semibold">{item.occurrence_count} lần</span>
           <span className="opacity-70">
-            TB {Math.round(item.avg_confidence * 100)}%
+            TB {Math.round((item.intensity_score ?? item.avg_confidence) * 100)}%
           </span>
+          {item.consecutive_days != null && (
+            <span className="opacity-70">{item.consecutive_days} ngày liên tiếp</span>
+          )}
           <span className="opacity-60">
             {formatDate(item.first_seen_at)} → {formatDate(item.last_seen_at)}
           </span>
         </div>
+
+        {hasCodes && (
+          <div className="flex gap-3 mt-2 text-[10px] font-mono opacity-50">
+            {item.dsm5_code && <span>DSM-5: {item.dsm5_code}</span>}
+            {item.icd11_code && <span>ICD-11: {item.icd11_code}</span>}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -149,7 +153,6 @@ export default function Trends() {
 
   const confirmedConditions = mentalHealth?.conditions?.filter(c => c.confirmed) ?? [];
   const pendingConditions   = mentalHealth?.conditions?.filter(c => !c.confirmed) ?? [];
-  const minOccurrences      = mentalHealth?.min_occurrences ?? 3;
 
   return (
     <main className="flex-1 md:ml-72 overflow-y-auto min-h-screen pb-12 pt-16 md:pt-0">
@@ -333,7 +336,7 @@ export default function Trends() {
                 Dự đoán tình trạng tâm thần
               </h3>
               <p className="text-sm text-on-surface-variant mt-1">
-                Tích lũy từ nhiều bài viết trong {mentalHealth?.window_days ?? 30} ngày qua · Xác nhận sau {minOccurrences} lần xuất hiện
+                Tích lũy từ nhiều bài viết trong {mentalHealth?.window_days ?? 30} ngày qua
               </p>
             </div>
           </div>
@@ -365,7 +368,7 @@ export default function Trends() {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {confirmedConditions.map(item => (
-                      <ConditionCard key={item.condition_name} item={item} minOccurrences={minOccurrences} />
+                      <ConditionCard key={item.condition_name} item={item} />
                     ))}
                   </div>
                 </div>
@@ -380,7 +383,7 @@ export default function Trends() {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {pendingConditions.map(item => (
-                      <ConditionCard key={item.condition_name} item={item} minOccurrences={minOccurrences} />
+                      <ConditionCard key={item.condition_name} item={item} />
                     ))}
                   </div>
                 </div>
@@ -389,9 +392,16 @@ export default function Trends() {
               {/* Disclaimer */}
               <div className="flex items-start gap-2 pt-2 border-t border-outline-variant/20">
                 <span className="material-symbols-outlined text-base text-on-surface-variant opacity-60 shrink-0 mt-0.5">info</span>
-                <p className="text-xs text-on-surface-variant opacity-60 leading-relaxed">
-                  Đây là dự đoán từ AI dựa trên ngôn ngữ trong nhật ký, không phải chẩn đoán y tế. Nếu lo lắng về sức khoẻ tâm thần, hãy tham khảo ý kiến chuyên gia.
-                </p>
+                <div>
+                  <p className="text-xs text-on-surface-variant opacity-60 leading-relaxed">
+                    {mentalHealth?.disclaimer?.vi || 'Đây là dự đoán từ AI dựa trên ngôn ngữ trong nhật ký, không phải chẩn đoán y tế. Nếu lo lắng về sức khoẻ tâm thần, hãy tham khảo ý kiến chuyên gia.'}
+                  </p>
+                  {mentalHealth?.disclaimer?.source && (
+                    <p className="text-[10px] text-on-surface-variant opacity-40 mt-1 font-mono">
+                      {mentalHealth.disclaimer.source}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
